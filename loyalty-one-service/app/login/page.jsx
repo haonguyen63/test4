@@ -1,30 +1,38 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { API } from '../lib/apiBase';
-import { safeFetch } from '../lib/http';
 
 export default function Login() {
-  const [username, setUsername] = useState('admin'); // có thể nhập số ĐT
+  const [username, setUsername] = useState('admin');   // có thể gõ số ĐT
   const [password, setPassword] = useState('changeme');
   const [error, setError] = useState('');
-  const router = useRouter();
 
   async function onSubmit(e) {
     e.preventDefault();
     setError('');
     try {
-      const body = { username, phone: username, password };
-      const data = await safeFetch(`${API}/auth/login`, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ username, phone: username, password })
       });
+      const ct = res.headers.get('content-type') || '';
+      const text = await res.text();
+      const data = ct.includes('application/json') ? JSON.parse(text) : null;
+
+      if (!res.ok) {
+        const msg = (data && (data.error || data.message)) ||
+                    (ct.includes('text/html') ? 'Server returned HTML instead of JSON' : text);
+        throw new Error(msg || 'login_failed');
+      }
+
+      // Lưu token + user
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      router.push('/pos');
+
+      // Điều hướng chắc chắn
+      window.location.href = '/pos';
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'login_failed');
     }
   }
 
