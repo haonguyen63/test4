@@ -4,20 +4,14 @@ import { useRouter } from 'next/navigation';
 import { API } from '../lib/apiBase';
 import { safeFetch } from '../lib/http';
 
-function useAuth() {
+export default function POS() {
+  const router = useRouter();
+
+  // Thêm cờ 'ready' để chỉ redirect sau khi đã đọc xong localStorage
+  const [ready, setReady] = useState(false);
   const [token, setToken] = useState('');
   const [user, setUser] = useState(null);
-  useEffect(()=>{
-    setToken(localStorage.getItem('token') || '');
-    const u = localStorage.getItem('user');
-    if (u) setUser(JSON.parse(u));
-  },[]);
-  return { token, user };
-}
 
-export default function POS() {
-  const { token, user } = useAuth();
-  const router = useRouter();
   const [phone, setPhone] = useState('0912345678');
   const [fullName, setFullName] = useState('');
   const [customer, setCustomer] = useState(null);
@@ -26,9 +20,21 @@ export default function POS() {
   const [result, setResult] = useState(null);
   const [err, setErr] = useState('');
 
-  useEffect(()=>{
-    if (!token) router.push('/login');
-  },[token, router]);
+  // Đọc localStorage 1 lần khi mount
+  useEffect(() => {
+    const t = typeof window !== 'undefined' ? (localStorage.getItem('token') || '') : '';
+    setToken(t);
+    const u = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    if (u) {
+      try { setUser(JSON.parse(u)); } catch {}
+    }
+    setReady(true);
+  }, []);
+
+  // Chỉ redirect về /login khi đã "ready" mà vẫn không có token
+  useEffect(() => {
+    if (ready && !token) router.replace('/login');
+  }, [ready, token, router]);
 
   async function search() {
     setErr(''); setCustomer(null);
@@ -65,6 +71,12 @@ export default function POS() {
       await search();
     } catch(e){ setErr(String(e.message)); }
   }
+
+  // Khi chưa ready: đừng render gì để tránh nháy trang
+  if (!ready) return null;
+
+  // Nếu có ready nhưng không có token, effect ở trên sẽ replace('/login')
+  if (!token) return null;
 
   return (
     <div className="card">
